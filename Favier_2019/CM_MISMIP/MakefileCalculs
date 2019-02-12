@@ -1,0 +1,64 @@
+CC=mpicc
+#CCFLAG=-fPIC
+CCFLAG=
+
+NN_HOME=/util/pygridgen/external/nn
+CS_HOME=/util/pygridgen/external/csa
+NNLIB=$(NN_HOME)/libnn.a
+CSLIB=$(CS_HOME)/libcsa.a
+
+#NETCDF INCLUDE and LIBS Flags
+NETCDFHOME="/opt/software/occigen/libraries/netcdf/4.4.0_fortran-4.4.2/hdf5/1.8.17/intel/17.0/openmpi/intel/2.0.1"
+NETCDFINC="-I$(NETCDFHOME)/include"
+NETCDFLIBS="-L$(NETCDFHOME)/lib -lnetcdff -lnetcdf"
+
+# non-committed elmerice in ELMERICE_SRC and ELMERICE_USF, and Nacho's in SOLVERS_SRC
+ELMERICE_MORE=/home/lfavier/util/ElmerNonOfficial/Sources
+ExecPath=/scratch/cnt0021/gge6066/lfavier/ELMERICE/PARAMS/Executables
+
+SOLVERS_LIST=$(ELMERICE_MORE)/SSAStar.F90 \
+        $(ELMERICE_MORE)/USF_MISMIP_Dom.F90 \
+        $(ELMERICE_MORE)/Flotation.F90\
+        $(ELMERICE_MORE)/EffectivePressure.F90\
+        $(ELMERICE_MORE)/ThicknessSolver_Alpha.F90 \
+        $(ELMERICE_MORE)/MISMIP_Melt_Param.F90 \
+        $(ELMERICE_MORE)/MISMIP_Melt_Param_Zambiant.F90 \
+        $(ELMERICE_MORE)/USF_CondDistance.F90 \
+        $(ELMERICE_MORE)/USF_WaterPressure.F90\
+        $(ELMERICE_MORE)/Compute2DNodalGradient.F90\
+        $(ELMERICE_MORE)/MISOMIP_Melt_Consv_Evolv.F90\
+        $(ELMERICE_MORE)/MISOMIP_Melt_Consv.F90\
+        $(ELMERICE_MORE)/MISOMIP_Melt.F90\
+        $(ELMERICE_MORE)/FrontThickness_mask.F90\
+        $(ELMERICE_MORE)/USF_CondFront.F90 
+
+solvers := $(filter %,$(patsubst %.F90,%,$(notdir $(SOLVERS_LIST)))) $(filter %,$(patsubst %.F90,%,$(LOCAL_SOLVERS)))
+
+all: $(solvers)
+
+MISOMIP_Melt_Consv_Evolv: $(ELMERICE_MORE)/MISOMIP_Melt_Consv_Evolv.F90
+	elmerf90 $< -I$(NETCDFF_INC) -L$(NETCDFF_LDFLAGS) -o $(ExecPath)/MISOMIP_Melt_Consv_Evolv
+
+MISOMIP_Melt_Consv: $(ELMERICE_MORE)/MISOMIP_Melt_Consv.F90
+	elmerf90 $< -I$(NETCDFF_INC) -L$(NETCDFF_LDFLAGS) -o $(ExecPath)/MISOMIP_Melt_Consv
+
+MISOMIP_Melt: $(ELMERICE_MORE)/MISOMIP_Melt.F90
+	elmerf90 $< -I$(NETCDFF_INC) -L$(NETCDFF_LDFLAGS) -o $(ExecPath)/MISOMIP_Melt
+
+MISMIP_Melt_Param: $(ELMERICE_MORE)/MISMIP_Melt_Param.F90
+	elmerf90 $< -I$(NETCDFF_INC) -L$(NETCDFF_LDFLAGS) -o $(ExecPath)/MISMIP_Melt_Param
+
+MISMIP_Melt_Param_Zambiant: $(ELMERICE_MORE)/MISMIP_Melt_Param_Zambiant.F90
+	elmerf90 $< -I$(NETCDFF_INC) -L$(NETCDFF_LDFLAGS) -o $(ExecPath)/MISMIP_Melt_Param_Zambiant
+
+FrontThickness_mask: $(ELMERICE_MORE)/FrontThickness_mask.F90
+	elmerf90 $< -I$(NETCDFF_INC) -L$(NETCDFF_LDFLAGS) -o $(ExecPath)/FrontThickness_mask
+
+%: $(ELMERICE_MORE)/%.F90
+	elmerf90  $< -o $(ExecPath)/$@
+
+%:%.F90
+	elmerf90  $< -o $(ExecPath)/$@
+
+clean:
+	rm -f $(solvers)

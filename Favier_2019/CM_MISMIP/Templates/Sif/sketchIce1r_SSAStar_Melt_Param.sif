@@ -1,0 +1,377 @@
+$name="<name>"
+
+!- MISMIP+ values :
+$yearinsec = 86400.0 * 365.2422 ! Year length in second
+$rhoi_SI   =  918.0             ! Ice density (kg/m^3)
+$rhosw_SI  = 1028.0             ! Sea water density (kg/m^3)
+$rhofw_SI  = 1000.0             ! Fresh water density (kg/m^3)
+$Lf_SI     =    3.34e5          ! Fusion Latent heat of Ice (J/kg)
+$cpw_SI    = 3974.0             ! Specific heat of sea water (J/kg/K)
+$grav_SI   =    9.81            ! Gravity (m/s^2)
+$lambda1   =   -0.0573          ! Liquidus slope  (K/psu)
+$lambda2   =    0.0832          ! Liquidus intercept  (K)
+$lambda3   =   -7.53e-8 * grav_SI * rhosw_SI ! Liquidus pressure coefficient  (K/m)
+$n         = 3.0                ! Glen law exponent
+$m         = 0.3333333333       ! Friction law exponent (1/m in MISMIP+ spec.)
+$C         = 1.0e-2             ! SSA friction parameter (MPa m^-1/3 a^1/3)
+$A         = 20.0               ! Glen’s law coefficient (MPa-3/yr)
+$eta       = (2.0*A)^(-1.0/n)   ! ?
+$zsl       = 0.0                ! Sea level
+$CCou      = 0.5                ! Coulomb law friction coefficient
+$accu      = 0.3                ! surface mass balance (m/yr)
+
+!- conversions to Elmer units:
+$rhoi    = rhoi_SI  / (1.0e6*yearinsec^2)
+$rhosw   = rhosw_SI / (1.0e6*yearinsec^2)
+$rhofw   = rhofw_SI / (1.0e6*yearinsec^2)
+$Lf      = Lf_SI   * yearinsec^2
+$cpw     = cpw_SI  * yearinsec^2
+$gravity = grav_SI * yearinsec^2 * (-1.0)
+
+!- specific to melt parameterizations :
+$meltfac    = rhosw_SI * cpw_SI / ( rhoi_SI * Lf_SI )
+!-
+$gammaT_SI     = <coefmlt> * 1.e-5       ! exchange velocity (m/s) used for Beckman & Goose 2002
+!-
+$facPDC_SI     = <coefmlt> * 1.0 * 4.997318167e-7    ! factor "K*Kt" (m/s) in Pollard & DeConto 2012
+!-
+$E0_LAZER      = 3.6e-2                  ! Entrainment coeff. (no unit) in Lazeroms et al.
+$GT_LAZER      = 1.1e-5                  ! Turbulent heat exchange coeff. (no unit) in Lazeroms et al.
+$GTS0_LAZER    = 6.0e-4                  ! Effective heat exchange coeff. (no unit) in Lazeroms et al.
+$K_LAZER       = <coefmlt>*1.0
+$TYPE_LAZER    = <lazert>                !if Lazeroms emulation used
+!-                                       !1 for simple, 2 for AppenB, 3 for Jenkins 
+!-
+$Nbox_PICO       = <nb_boxes>                     ! nb of boxes in PICO
+$Zambiant_PICO   = 700.0                 ! Depth of ambiant T,S (T0,S0 in Reese et al.)
+$gammaT_PICO_SI  = <coefmlt>*2.0e-5                 ! gamma_T_star in Reese et al. (m/s) in [5.e-6;1.e-4]
+$C_PICO_SI       = 1.0e6                   ! Circulation parameter C (Sv) in [0.1;9]
+$alpha_PICO      = 7.5e-5              ! Thermal expansion coefficient for linear EOS (K^-1)
+$beta_PICO       = 7.7e-4              ! Salinity contraction coefficient for linear EOS (psu^-1)
+$rhostar_SI_PICO = 1027.51               ! In situ density for linear EOS (kg/m3)
+
+$gammaT = gammaT_SI * yearinsec
+$facPDC = facPDC_SI * yearinsec
+$gammaT_PICO = gammaT_PICO_SI * yearinsec
+$C_PICO = C_PICO_SI * (1.0e6*yearinsec^2) * yearinsec
+$rhostar_PICO = rhostar_SI_PICO / (1.0e6*yearinsec^2)
+
+!- Information on the experiment (nico's kitchen)
+$EXPnb     = <ExpNb>  ! Experiment Number: in {3,4,10,11,12,13}, check MISMIP_Melt_PDC.F90 
+$time_init = 4202.50  ! Initial time, i.e. time of initial restart (yr) -> used for changing T,S
+$xfront    = 640000.0 ! Position of the ice shelf front
+
+!---------------------------------------------------------
+
+Header
+  Mesh DB "<MeshPath>" "<mesh>"
+End
+
+Constants
+  sea level = Real 0.0
+  water density = Real $rhosw
+  !Gravity = Real $gravity
+  Liquidus slope = Real $lambda1
+  Liquidus intercept = Real $lambda2
+  Liquidus pressure coeff = Real $lambda3
+  Melt factor = Real $meltfac
+  Multiplying Factor BG = Real $gammaT
+  Multiplying Factor PDC = Real $facPDC
+  Entrainment Coeff LAZER = Real $E0_LAZER
+  Heat Exchange Coeff LAZER = Real $GT_LAZER
+  Effective Exchange Coeff LAZER = Real $GTS0_LAZER
+  K Coeff LAZER = Real $K_LAZER
+  Type LAZER = Integer $TYPE_LAZER
+  Number Boxes PICO = Integer $Nbox_PICO
+  Depth Ambiant PICO = Real $Zambiant_PICO
+  Circulation Parameter PICO = Real $C_PICO
+  Effective Exchange Velocity PICO = Real $gammaT_PICO
+  Thermal expansion coeff PICO = Real $alpha_PICO
+  Salinity contraction coeff PICO = Real $beta_PICO
+  EOS ref Density PICO = Real $rhostar_PICO
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Experiment Number = Integer $EXPnb
+  Experiment initial time = Real $time_init
+  ! Melt Parameterization, possible values = bg, pdc, pdcstar, pico, lazer :
+  Melt Parameterization = String "<parmlt>"
+  Grounding Line Melt = Logical False
+ 
+  Coordinate System  = Cartesian 2D 
+  Simulation Type = Transient     
+
+  Timestepping Method = "bdf"
+  BDF Order = 1
+  Output Intervals = <outIntervals>
+  Timestep Intervals = <Intervals>
+  Timestep Sizes = <TimeStep>
+
+  Steady State Convergence Tolerance = Real 2.0
+
+  Steady State Min Iterations = Integer 1
+  Steady State Max Iterations = Integer 2
+
+  Post File = "$name$.vtu"
+  OutPut File = "<ResultsPath>/$name".result"
+  Binary Output = Logical True
+
+  Restart File = "<Restart>"
+  Restart Position = Integer <RestartPosition>
+  Restart Before Initial Conditions = Logical False
+  
+  !MeltFactor = REAL $mltrate
+
+  max output level = 3
+
+  Initialize Dirichlet Conditions = logical False
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body 1
+  Equation = 1
+  Body Force = 1
+  Material = 1
+  Initial Condition = 1
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  Melt = Real -0.0
+  !distIF = Variable Coordinate 1
+  !  Real MATC "xfront - tx(0)"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = Real 0.0                          
+  Flow BodyForce 2 = Real 0.0                          
+  Flow BodyForce 3 = Real $gravity
+  Top Surface Accumulation = Real $accu
+  Bottom Surface Accumulation = equals Melt
+  Water Pressure = Variable Zb
+    Real procedure "<ExecPath>/USF_WaterPressure" "WaterPressure"
+  distGL = Real 0.0  ! used in Solver DistanceSolver1
+  distGL Condition = Variable GroundedMask
+    Real procedure "<ExecPath>/USF_CondDistance" "CondDistance"
+  distIF = Real 0.0
+  distIF Condition = Variable FrontMask
+    Real procedure "<ExecPath>/USF_CondFront" "CondFront"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+
+  ! Material properties
+  Viscosity = Real $eta
+  Viscosity Exponent = Real 0.3333333333333333333
+  Critical Shear Rate = Real 1.0e-16
+
+  SSAStar Integrated Viscosity = Real $eta
+
+  SSA Mean Viscosity = Real $eta
+  SSA Mean Density = Real $rhoi
+
+  SSA Critical Thickness = Real 1.0e00
+
+  ! slip coeffs
+  SSA Friction Law = String "coulomb"
+  SSA Friction Exponent = Real $m
+  SSA Friction Parameter = Real $C
+  SSA Friction Linear Velocity = REAL 1.0e0
+  !SSA Min Effective Pressure = Real 1.0e-6
+
+  SSA Friction Post-Peak = Real 1.0
+  SSA Friction Maximum Value = Real $CCou
+
+  Min H = Real 1.0e00
+
+  ! For Save scalar to compute mass flux (=H*SSA_UV)
+  Flux = Equals H
+
+End
+ 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Apply flotaison; from H compute Zb and Zs
+Solver 1
+   !Exec Solver = never
+   Equation = "Flotation"
+   Variable = GroundedMask
+     Procedure = "<ExecPath>/Flotation" "Flotation"
+End
+
+!--------
+Solver 2
+!   Exec Solver = never
+   Equation = "EffectivePressure"
+   Variable =  "Effective Pressure"
+     Procedure = "<ExecPath>/EffectivePressure" "EffectivePressure"
+End
+
+!--------
+Solver 3
+   Equation = "SSA"
+   !Exec Solver = never
+   Variable = -dofs 2 "SSAVelocity"
+     Procedure = "<ExecPath>/SSAStar" "SSABasalSolver"
+   !-
+   Linear System Solver = Direct
+   Linear System Direct Method = umfpack
+   Nonlinear System Max Iterations = 50
+   Nonlinear System Convergence Tolerance  = 1.0e-08
+   Nonlinear System Newton After Iterations = 3
+   Nonlinear System Newton After Tolerance = 1.0e-03
+   Nonlinear System Relaxation Factor = 1.00
+   Nonlinear System Newton Max divergent iterations = Integer 4
+   !-
+   Sub-Element GL parameterization = Logical True
+   GL integration points number = Integer 20
+   !-
+   Solve SSA Star = LOGICAL True
+   SSA Star Internal viscosity integration = Logical True
+   SSA Star Integrations levels = Integer 10
+   SSAStar Integration levels ratio = Real 1.0
+   !-
+   Exported Variable 1 = Zs
+   Exported Variable 2 = Zb
+   Exported Variable 3 = bedrock
+   Exported Variable 4 = h
+   Exported Variable 5 = -dofs 1 "Effective Pressure"
+   Exported Variable 6 = Melt
+End
+
+!--------
+!! Thickness solver
+Solver 4
+   Equation = "Thickness"
+   !Exec Solver = never
+   Variable = -dofs 1 "H"
+   Exported Variable 1 = -dofs 1 "H Residual"
+   Exported Variable 2 = DhDt
+   Procedure = "<ExecPath>/ThicknessSolver_Alpha" "ThicknessSolver"
+   Before Linsolve = "EliminateDirichlet" "EliminateDirichlet"
+   !-
+   Linear System Solver = Direct
+   Linear System Direct Method = umfpack
+   Linear System Convergence Tolerance = 1.0e-12
+   !- equation is linear if no min/max
+   Nonlinear System Max Iterations = 15
+   Nonlinear System Convergence Tolerance  = 1.0e-09
+   Nonlinear System Relaxation Factor = 1.00
+   !-
+   Apply Dirichlet = Logical True
+   !Stabilization Method = Bubbles
+   Stabilization Method = Stabilized
+   Compute dHdT = Logical True
+   !- the convection velocity (mean horizontal velocity)
+   Flow Solution Name = String "SSAVelocity"
+End
+
+!--------
+Solver 5
+   Exec Solver = After Simulation
+   Equation = "FlotationB"
+   Variable = GroundedMask
+     Procedure = "<ExecPath>/Flotation" "Flotation"
+End
+
+!--------
+Solver 6
+   Exec Solver = Before Simulation
+   Equation = "Flotation3"
+   Variable = GroundedMask
+     Procedure = "<ExecPath>/Flotation" "Flotation"
+End
+
+!--------
+! Solver to calculate the distance to the grounding line :
+! Only used if Melt Parameterization = "PICO"
+Solver 7
+  Exec Solver = <ExeDst>
+  Equation = "distance GL"
+  Variable = -dofs 1 distGL
+    Procedure = "DistanceSolve" "DistanceSolver1"
+  Optimize Bandwidth = logical False
+  Exported variable 1 = -dofs 1 distGL
+  !Exported variable 2 = -dofs 1 distIF
+End
+
+Solver 8
+  Exec Solver = <ExeDst>
+  Equation = "FrontMask"
+  Variable = FrontMask
+  Variable DOFs = 1
+    Procedure = "<ExecPath>/FrontThickness_mask" "FrontThickness_mask"
+End
+
+Solver 9
+  Exec Solver = <ExeDst>
+  Equation = "Real distance IF"
+  Variable = -dofs 1 distIF
+    Procedure = "DistanceSolve" "DistanceSolver1"
+  Optimize Bandwidth = logical False
+  Exported variable 1 = -dofs 1 distIF
+End
+
+!--------
+! Ice draft Slope : Only used if Melt Parameterization = "LAZER" ou "LITTLE"
+! see http://elmerice.elmerfem.org/wiki/doku.php?id=solvers:2dnodalgradient
+Solver 10
+  Exec Solver = <ExeSlp>
+  Equation = "Nodal Gradient"
+  Variable = -dofs 2 isfslope
+    Procedure = "<ExecPath>/Compute2DNodalGradient" "Compute2DNodalGradient"
+  Optimize Bandwidth = False
+  Variable Name = string "Zb"
+  FE consistent average = Logical True
+End
+
+!--------
+Solver 11
+   !Exec Solver = Never
+   Equation = "MISMIP melt"
+   Variable = Melt
+     Procedure = "<ExecPath>/MISMIP_Melt_Param" "MISMIP_Melt_Param"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Equation 1
+  Active Solvers(11) = 1 2 3 4 5 6 7 8 9 10 11
+  !Active Solvers(8) = 1 2 3 4 5 6 7 8
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Boundary Condition 1
+  name = "side1"
+  Target Boundaries = 1 
+  Save Scalars = Logical True
+  SSAVelocity 2 = Real 0.0
+End
+
+!--------
+Boundary Condition 2
+  name = "calving front"
+  Target Boundaries = 2
+  Save Scalars = Logical True
+  Calving Front = Logical True
+End
+
+!--------
+Boundary Condition 3
+  name = "side2"
+  Target Boundaries = 3
+  Save Scalars = Logical True
+  SSAVelocity 2 = Real 0.0
+End
+
+!--------
+Boundary Condition 4
+  name = "inflow"
+  Target Boundaries = 4
+  Save Scalars = Logical True
+  SSAVelocity 1 = Real 0.0
+  SSAVelocity 2 = Real 0.0
+
+End

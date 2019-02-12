@@ -1,0 +1,141 @@
+$name="<name>"
+
+!- MISMIP+ values :
+$yearinsec = 86400.0 * 365.2422 ! Year length in second
+$rhoi_SI   =  918.0             ! Ice density (kg/m^3)
+$rhosw_SI  = 1028.0             ! Sea water density (kg/m^3)
+$rhofw_SI  = 1000.0             ! Fresh water density (kg/m^3)
+$Lf_SI     =    3.34e5          ! Fusion Latent heat of Ice (J/kg)
+$cpw_SI    = 3974.0             ! Specific heat of sea water (J/kg/K)
+$grav_SI   =    9.81            ! Gravity (m/s^2)
+$lambda1   =   -0.0573          ! Liquidus slope  (K/psu)
+$lambda2   =    0.0832          ! Liquidus intercept  (K)
+$lambda3   =   -7.53e-8 * grav_SI * rhosw_SI ! Liquidus pressure coefficient  (K/m)
+$n         = 3.0                ! Glen law exponent
+$m         = 0.3333333333       ! Friction law exponent (1/m in MISMIP+ spec.)
+$C         = 1.0e-2             ! SSA friction parameter (?)
+$A         = 20.0               ! Glen’s law coefficient (MPa-3/yr)
+$eta       = (2.0*A)^(-1.0/n)   ! ?
+$zsl       = 0.0                ! Sea level
+$CCou      = 0.5                ! Coulomb law friction coefficient
+$accu      = 0.3                ! surface mass balance (m/yr)
+
+!- conversions to Elmer units:
+$rhoi    = rhoi_SI  / (1.0e6*yearinsec^2)
+$rhosw   = rhosw_SI / (1.0e6*yearinsec^2)
+$rhofw   = rhofw_SI / (1.0e6*yearinsec^2)
+$Lf      = Lf_SI   * yearinsec^2
+$cpw     = cpw_SI  * yearinsec^2
+$gravity = grav_SI * yearinsec^2 * (-1.0)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Header
+  Mesh DB "<MeshPath>" "<mesh>"
+End
+
+Constants
+  sea level = Real 0.0
+  water density = Real $rhosw
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  = Cartesian 2D 
+  Simulation Type = Steady  
+  !-
+  Timestepping Method = "bdf"
+  BDF Order = 1
+  Output Intervals = 1
+  Timestep Intervals = 1
+  Timestep Sizes = 1
+  !-
+  Steady State Min Iterations = 1
+  Steady State Max Iterations = 1
+  !-
+  Post File = "$name$.vtu"
+  OutPut File = "<ResultsPath>$name".result"
+  Binary Output = Logical True
+  !-
+  Restart File = "<Restart>"
+  Restart Position = Integer <RestartPosition>
+  Restart Before Initial Conditions = Logical False
+  !-
+  max output level = 3
+  Initialize Dirichlet Conditions = logical False
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!For the SSA
+Body 1
+  Equation = 1
+  Body Force = 1
+  Material = 1
+  Initial Condition = 1
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  Melt = Real -0.0
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = Real 0.0                          
+  Flow BodyForce 2 = Real 0.0                          
+  Flow BodyForce 3 = Real $gravity
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+  SSA Mean Density = Real $rhoi
+! Material properties
+  Viscosity Exponent = Real 0.3333333333333333333            
+  Critical Shear Rate = Real 1.0e-16
+  Min H = Real 1.0e00
+!! Save scalar to compute mass flux (=H*SSA_UV)
+   Flux = Equals H
+End
+ 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Apply flotaison; from H compute Zb and Zs
+Solver 1
+   !Exec Solver = never
+   Equation = "Flotation"
+      Variable = GroundedMask
+            Procedure = "<ExecPath>/Flotation" "Flotation"
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Equation 1
+  Active Solvers(1) = 1
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Boundary Condition 1
+  name = "side1"
+  Target Boundaries = 1 
+  Save Scalars = Logical True
+  SSAVelocity 2 = Real 0.0
+End
+
+Boundary Condition 2
+  name = "calving front"
+  Target Boundaries = 2
+  Save Scalars = Logical True
+  Calving Front = Logical True
+End
+
+Boundary Condition 3
+  name = "side2"
+  Target Boundaries = 3
+  Save Scalars = Logical True
+  SSAVelocity 2 = Real 0.0
+End
+
+Boundary Condition 4
+  name = "inflow"
+  Target Boundaries = 4
+  Save Scalars = Logical True
+  SSAVelocity 1 = Real 0.0
+  SSAVelocity 2 = Real 0.0
+End
